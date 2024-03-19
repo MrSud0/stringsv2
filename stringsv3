@@ -1,0 +1,56 @@
+#!/bin/bash
+
+# Default parameters
+min_length=4 # Default minimum string length
+pattern=".*" # Default regex that matches everything
+output_dir="./" # Default output directory to save the output files
+
+# Print usage information
+usage() {
+    echo "Usage: $0 [options] file..."
+    echo "Options:"
+    echo "  -l LENGTH    Minimum string length (default: 4)"
+    echo "  -p PATTERN   Regex pattern for filtering strings"
+    echo "  -o DIRECTORY Output directory for the resulting files"
+    echo "  -h           Display this help and exit"
+}
+
+# Parse command-line options
+while getopts "l:p:o:h" opt; do
+    case ${opt} in
+        l ) min_length=$OPTARG ;;
+        p ) pattern=$OPTARG ;;
+        o ) output_dir=$OPTARG ;;
+        h ) usage; exit ;;
+        \? ) usage; exit 1 ;;
+    esac
+done
+shift $((OPTIND -1))
+
+# Check for at least one input file
+if [ $# -eq 0 ]; then
+    echo "Error: No input files specified."
+    usage
+    exit 1
+fi
+
+# Ensure the output directory exists
+mkdir -p "$output_dir"
+
+# Main processing loop for each file
+for file in "$@"; do
+    # Detect file type
+    file_type=$(file "$file")
+    echo "Processing $file ($file_type)"
+    
+    # Determine output file name
+    base_name=$(basename -- "$file")
+    output_file="$output_dir/${base_name}.strings.txt"
+    
+    # Extract strings, apply filters, and write to output file
+    {
+        (strings -a -td "$file" | sed 's/^\(\s*[0-9][0-9]*\) \(.*\)$/\1 A \2/' ; strings -a -td -el "$file" | sed 's/^\(\s*[0-9][0-9]*\) \(.*\)$/\1 W \2/') | awk -v min_length="$min_length" -v pattern="$pattern" '$3 ~ pattern && length($3) >= min_length' | sort -n | uniq
+    } > "$output_file"
+    
+    echo "Output written to $output_file"
+done
